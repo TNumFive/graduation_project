@@ -230,12 +230,12 @@ def train_model(
 def visualize_test(prefix:str,y_true,y_pred):#plot last day prediction
     prefix='./'+prefix+'/'
     pyplot.figure(figsize=(21,9))
-    pyplot.title('pred vs. true (last 80*7)')
+    pyplot.title('pred vs. true (last 80*22)')
     if len(y_pred)>20*4*1*22:
-        y_pred=y_pred[-20*4*1*22:]
-        y_true=y_true[-20*4*1*22:]
-    pyplot.plot(y_true,label='y_true',linewidth=0.2)
-    pyplot.plot(y_pred,label='y_pred',linewidth=0.2,linestyle='-')
+        y_pred=y_pred[-20*4*1*22+14::22]
+        y_true=y_true[-20*4*1*22+14::22]
+    pyplot.plot(y_true,label='y_true',linewidth=1)
+    pyplot.plot(y_pred,label='y_pred',linewidth=1,linestyle='-')
     pyplot.legend()
     pyplot.show()
     pyplot.savefig(prefix+'y_pred.png')

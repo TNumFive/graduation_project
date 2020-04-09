@@ -35,8 +35,6 @@ if __name__ == "__main__":
     model.compile(optimizer='adam',metrics=['mae','mape'],loss='mse')
     model.summary()
 
-    prefix='puredense'
-    prefix='temp/'+prefix
     st_train=st_train.squeeze()
     st_test=st_test.squeeze()
 
