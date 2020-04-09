@@ -1,4 +1,4 @@
-from utility import custom_scale2,train_model,mae,mape
+from utility import custom_scale2,train_model,mae,mape,visualize_test
 from matplotlib import pyplot
 import numpy as np
 import os
@@ -6,6 +6,11 @@ import os
 np.random.seed(seed=5)
 
 if __name__ == "__main__":
+    
+    prefix='convlstm'#script will create dir called ./temp/${prefix} to store model,weight history and pred vs. true
+    prefix='temp/'+prefix
+
+    #generate data
     st_train,st_test,lt_train,lt_test,se_train,se_test,le_train,le_test,op_train,op_test=custom_scale2()
     
     from keras.models import Sequential,load_model
@@ -33,8 +38,6 @@ if __name__ == "__main__":
     model.compile(optimizer='adam',metrics=['mae','mape'],loss='mse')
     model.summary()
 
-    prefix='convlstm'
-    prefix='temp/'+prefix
     st_train=st_train[:,:,:,:,np.newaxis]
     st_test=st_test[:,:,:,:,np.newaxis]
     
@@ -49,10 +52,4 @@ if __name__ == "__main__":
     
         y_pred=y_pred.flatten()
         op_test=op_test.flatten()
-        pyplot.figure(figsize=(21,9))
-        pyplot.title('pred vs. true')
-        pyplot.plot(op_test,label='y_true',linewidth=0.2)
-        pyplot.plot(y_pred,label='y_pred',linewidth=0.2)
-        pyplot.legend()
-        pyplot.show()
-        pyplot.savefig(prefix+'y_pred.png')
+        visualize_test(prefix,op_test,y_pred)

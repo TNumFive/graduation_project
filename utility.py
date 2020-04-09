@@ -108,7 +108,7 @@ def onehot_external_features()->(dict,dict):
         wd_dict[wd_list[i]]=wd_array[i]
     return weather_dict,wd_dict
 
-def custom_scale2(fore_step=4,output_step=1,sta_num=22,feature=1,ratio=0.6777)->(nda,nda,nda,nda,nda,nda,nda,nda,nda,nda):
+def custom_scale2(fore_step=4,output_step=1,sta_num=22,feature=1,ratio=0.7)->(nda,nda,nda,nda,nda,nda,nda,nda,nda,nda):
     st=pd.read_csv('./data/temp_dataset_st.csv',parse_dates=['start_time'])
     lt=pd.read_csv('./data/temp_dataset_lt.csv',parse_dates=['start_time'])
     se=pd.read_csv('./data/temp_dataset_se.csv',parse_dates=['date'])
@@ -121,8 +121,8 @@ def custom_scale2(fore_step=4,output_step=1,sta_num=22,feature=1,ratio=0.6777)->
     op.set_index(['start_time'],inplace=True)
     
     splitpoint=int(len(op)/output_step*ratio)
-    if splitpoint>=20*4*7:
-        splitpoint=20*4*7#just predict the last week
+    #if splitpoint>=20*4*7:
+    #    splitpoint=20*4*7#just predict the last week
     data=st.to_numpy().reshape((int(len(st)/fore_step),fore_step,sta_num,feature))/60.0
     st_train=data[:splitpoint]
     st_test=data[splitpoint:]
@@ -163,6 +163,7 @@ def visualize_train(prefix:str,history):
     pyplot.title('history metrics(lower is better)')
     pyplot.xlabel('epoch')
     pyplot.ylabel('loss(rmse)/mae(100s)/accuracy')
+    pyplot.ylim(ymax=1.0)
     
     for i in range(0,len(history.history['loss'])):
         #turn mse to rmse
@@ -231,8 +232,8 @@ def visualize_test(prefix:str,y_true,y_pred):#plot last day prediction
     pyplot.figure(figsize=(21,9))
     pyplot.title('pred vs. true (last 80*7)')
     if len(y_pred)>20*4*1*22:
-        y_pred=y_pred[20*4*1*22:]
-        y_true=y_true[20*4*1*22:]
+        y_pred=y_pred[-20*4*1*22:]
+        y_true=y_true[-20*4*1*22:]
     pyplot.plot(y_true,label='y_true',linewidth=0.2)
     pyplot.plot(y_pred,label='y_pred',linewidth=0.2,linestyle='-')
     pyplot.legend()

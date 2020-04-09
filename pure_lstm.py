@@ -6,8 +6,12 @@ import os
 np.random.seed(seed=5)
 
 if __name__ == "__main__":
+    prefix='pure_lstm'#script will create dir called ./temp/${prefix} to store model,weight history and pred vs. true
+    prefix='temp/'+prefix
+
+    #generate data
     st_train,st_test,lt_train,lt_test,se_train,se_test,le_train,le_test,op_train,op_test=custom_scale2()
-    
+
     from keras.models import Sequential,load_model
     from keras.layers import BatchNormalization,LSTM,Dropout,Dense,RepeatVector,TimeDistributed,Flatten
 
@@ -31,8 +35,6 @@ if __name__ == "__main__":
     model.compile(optimizer='adam',metrics=['mae','mape'],loss='mse')
     model.summary()
 
-    prefix='purelstm'
-    prefix='temp/'+prefix
     st_train=st_train.squeeze()
     st_test=st_test.squeeze()
 
