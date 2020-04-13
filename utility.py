@@ -16,6 +16,11 @@ from keras.losses import mean_absolute_percentage_error,mean_absolute_error,mean
 from keras import backend as K
 from sklearn.preprocessing import OneHotEncoder
 
+def print_log(s:str,end='\n',log_name='runtime.log'):
+        runtime=open(log_name,'a+')
+        runtime.write(s+end)
+        runtime.close()
+
 class CustomModelCheckpoint(Callback):
     def __init__(self, dirpath, filepath, monitor='val_loss', 
                  mode='auto', period=1,verbose=1):
@@ -68,13 +73,16 @@ class CustomModelCheckpoint(Callback):
                     print('save to:',path)
             if epoch!=self.best_epoch:
                 self.model.set_weights(self.best_weight)
-
+    
     def on_train_end(self,logs=None):
         if self.update==1:#updated but not saved
             path=self.filepath.format(epoch=self.best_epoch+1,**(self.best_logs))
             os.rename(self.dirpath+'model.hdf5',self.dirpath+path)
             if self.verbose==1:
                 print('save to:',path)
+        self.model.summary(print_fn=print_log)
+        print_log(self.filepath.format(epoch=self.best_epoch+1,**(self.best_logs)))
+
 
 #loss function
 def rmse(y_true,y_pred):
@@ -116,8 +124,10 @@ def custom_scale2(fore_step=4,output_step=1,sta_num=22,feature=1,ratio=0.7)->(nd
     op=pd.read_csv('./data/temp_dataset_op.csv',parse_dates=['start_time'])
     st.set_index(['start_time'],inplace=True)
     lt.set_index(['start_time'],inplace=True)
-    se.set_index(['date'],inplace=True)
-    le.set_index(['date'],inplace=True)
+    #se.set_index(['date'],inplace=True)#this might be a problem as one date might appear few times
+    se.drop(columns=['date','dw','nw','wd'],inplace=True)#in case of new external features
+    #le.set_index(['date'],inplace=True)
+    le.drop(columns=['date','dw','nw','wd'],inplace=True)
     op.set_index(['start_time'],inplace=True)
     
     splitpoint=int(len(op)/output_step*ratio)
@@ -148,6 +158,84 @@ def custom_scale2(fore_step=4,output_step=1,sta_num=22,feature=1,ratio=0.7)->(nd
     le_test=data[splitpoint:]
     print('long external feature',data.shape)
     #print(data[0])    
+
+    data=op.to_numpy()/60.0
+    op_train=data[:splitpoint]
+    op_test=data[splitpoint:]
+    print('output',data.shape)
+    #print(data[0])
+
+    return st_train,st_test,lt_train,lt_test,se_train,se_test,le_train,le_test,op_train,op_test
+
+def custom_scale3(fore_step=4,output_step=1,sta_num=22,feature=1,ratio=0.7)->(nda,nda,nda,nda,nda,nda,nda,nda,nda,nda):
+    st=pd.read_csv('./data/temp_dataset_st.csv',parse_dates=['start_time'])
+    lt=pd.read_csv('./data/temp_dataset_lt.csv',parse_dates=['start_time'])
+    se=pd.read_csv('./data/temp_dataset_se.csv',parse_dates=['date'])
+    le=pd.read_csv('./data/temp_dataset_le.csv',parse_dates=['date'])
+    op=pd.read_csv('./data/temp_dataset_op.csv',parse_dates=['start_time'])
+    st.set_index(['start_time'],inplace=True)
+    lt.set_index(['start_time'],inplace=True)
+    #se.set_index(['date'],inplace=True)
+    #le.set_index(['date'],inplace=True)
+    se.drop(columns=['date'],inplace=True)
+    le.drop(columns=['date'],inplace=True)
+    op.set_index(['start_time'],inplace=True)
+
+    #one-hot encode str-like external feature
+    weather_dict,wd_dict=onehot_external_features()
+    #split weather&wind direction array
+    for i in range(0,len(se)):
+        se.at[i,'dw']=weather_dict[se.at[i,'dw']]
+        se.at[i,'nw']=weather_dict[se.at[i,'nw']]
+        se.at[i,'wd']=wd_dict[se.at[i,'wd']]
+    for i in range(0,len(se.at[i,'dw'])):
+        i_str='%02d' %i
+        se.loc[:,'dw'+i_str]=se.loc[:,'dw'].map(lambda x: x[i])
+        se.loc[:,'nw'+i_str]=se.loc[:,'nw'].map(lambda x: x[i])
+    for i in range(0,len(se.at[i,'wd'])):
+        i_str='%02d' %i
+        se.loc[:,'wd'+i_str]=se.loc[:,'wd'].map(lambda x: x[i])
+    se.drop(columns=['dw','nw','wd'],inplace=True)
+    for i in range(0,len(le)):
+        le.at[i,'dw']=weather_dict[le.at[i,'dw']]
+        le.at[i,'nw']=weather_dict[le.at[i,'nw']]
+        le.at[i,'wd']=wd_dict[le.at[i,'wd']]
+    for i in range(0,len(le.at[i,'dw'])):
+        i_str='%02d' %i
+        le.loc[:,'dw'+i_str]=le.loc[:,'dw'].map(lambda x: x[i])
+        le.loc[:,'nw'+i_str]=le.loc[:,'nw'].map(lambda x: x[i])
+    for i in range(0,len(le.at[i,'wd'])):
+        i_str='%02d' %i
+        le.loc[:,'wd'+i_str]=le.loc[:,'wd'].map(lambda x: x[i])
+    le.drop(columns=['dw','nw','wd'],inplace=True)
+    
+    splitpoint=int(len(op)/output_step*ratio)
+    data=st.to_numpy().reshape((int(len(st)/fore_step),fore_step,sta_num,feature))/60.0
+    st_train=data[:splitpoint]
+    st_test=data[splitpoint:]
+    print('short term',data.shape)
+    #print(data[0])
+
+    data=lt.to_numpy().reshape((int(len(lt)/fore_step),fore_step,sta_num,feature))/60.0
+    lt_train=data[:splitpoint]
+    lt_test=data[splitpoint:]
+    print('long term',data.shape)
+    #print(data[0])
+
+    se.loc[:,'AQI']=np.ceil(se.loc[:,'AQI']/50.0)
+    data=se.to_numpy()
+    se_train=data[:splitpoint]
+    se_test=data[splitpoint:]
+    print('short external feature',data.shape)
+    print(data[0])
+
+    le.loc[:,'AQI']=np.ceil(le.loc[:,'AQI']/50.0)
+    data=le.to_numpy()
+    data=data.reshape((int(len(le)/fore_step),fore_step,len(le.columns)))
+    le_train=data[:splitpoint]
+    le_test=data[splitpoint:]
+    print('long external feature',data.shape)
+    print(data[0])    
 
     data=op.to_numpy()/60.0
     op_train=data[:splitpoint]
@@ -200,17 +288,17 @@ def train_model(
                 verbose=1
                 )->Model:
     prefix=prefix.split('/')
-    dl=os.listdir()
+    dl=os.listdir()#pwd: ${ori}
     if prefix[0] not in dl:
         os.mkdir(prefix[0])
-    os.chdir(prefix[0])
+    os.chdir(prefix[0])# pwd: temp/
     dl=os.listdir()
     if prefix[1] not in dl:
         os.mkdir(prefix[1])
-    os.chdir('..')
+    os.chdir('..')#pwd: ${ori}
     prefix=prefix[0]+'/'+prefix[1]
     
-    prefix='./'+prefix+'/'
+    prefix='./'+prefix+'/'#./temp/${model_name}/
     path='model_{epoch:04d}_{val_loss:.04f}_{val_mae:.04f}_{val_mape:04f}.hdf5'
     checkpoint=CustomModelCheckpoint(dirpath=prefix,filepath=path,period=10)
     earlystop=EarlyStopping(patience=20,restore_best_weights=True)

@@ -11,7 +11,7 @@ if __name__ == "__main__":
     prefix='temp/'+prefix
 
     #generate data
-    st_train,st_test,lt_train,lt_test,se_train,se_test,le_train,le_test,op_train,op_test=custom_scale2()
+    st_train,st_test,lt_train,lt_test,se_train,se_test,le_train,le_test,op_train,op_test=custom_scale3()
     
     from keras.models import Sequential,load_model,Model
     from keras import layers
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     model.add(Flatten())
     #compile model here,use default mae mape and mse ,when compare we can compute base on mse to get rmse
     model.compile(optimizer='adam',metrics=['mae','mape'],loss='mse')
-    model.summary()
+    #model.summary()
 
     #final process on preprocess data
     st_train=st_train.squeeze()
@@ -41,6 +41,7 @@ if __name__ == "__main__":
     x_test=st_test
     y_train=op_train
     y_test=op_test
+    '''
     #train model with custom-modelcheckpoint, earylstopping and reducelronplateau callback
     model=train_model(prefix,model,x_train,y_train,x_test,y_test,verbose=1)
     
@@ -49,3 +50,4 @@ if __name__ == "__main__":
     y_pred=model.predict(x_test)
     #use flatten data in case 1000 lines on a graph
     visualize_test(prefix,op_test.flatten(),y_pred.flatten())
+    '''

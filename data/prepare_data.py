@@ -170,7 +170,7 @@ def prepare_dataset2(data:pd.DataFrame,fore_step=4,sta_num=22,output_step=1,slot
     data.set_index('start_time',inplace=True,drop=False)
     weather=pd.read_csv('weather.csv',parse_dates=['date'])
     #date,AQI,qg,PM2.5,PM10,SO2,CO,NO2,O3_8h,dw,nw,ht,lt,wd,wf
-    weather=pd.DataFrame(weather,columns=['date','AQI','ht','lt','wf'])
+    weather=pd.DataFrame(weather,columns=['date','AQI','dw','nw','ht','lt','wd','wf'])
     weather.set_index(['date'],inplace=True,drop=False)
     #add weekdayt te weather
     #todo:
@@ -180,7 +180,7 @@ def prepare_dataset2(data:pd.DataFrame,fore_step=4,sta_num=22,output_step=1,slot
         weather.at[i,'wday']=wd
 
     columns=['start_time','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23']
-    col_ef=['date','AQI','ht','lt','wf','wday']
+    col_ef=['date','wday','AQI','ht','lt','wf','wd','dw','nw']
     for i in range(fore_step-1,len(data)):
         rowtime:pd.Timedelta = data.iloc[i].name
         s=pd.DataFrame(columns=columns)#short term dependency
