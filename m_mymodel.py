@@ -6,7 +6,7 @@ import sys
 np.random.seed(seed=5)
 
 if __name__ == "__main__":
-    
+
     #script will create dir called ./temp/${prefix} to store model,weight history and pred vs. true
     prefix=os.path.basename(sys.argv[0])
     prefix=prefix[:-3]
@@ -24,25 +24,26 @@ if __name__ == "__main__":
     st=Input(shape=(4,22,1))
     le=Input(shape=(4,le_train.shape[2]))
     se=Input(shape=(se_train.shape[1],))
-    
-    op1=TimeDistributed(layers.Conv1D(filters=1,kernel_size=6,padding='same'))(lt)
-    op1=layers.Reshape((4,22))(op1)
-    #op1=concatenate([op1,le])
-    op1=LSTM(units=64,return_sequences=True)(op1)
-    op1=Attention(method='cba')(op1)
 
-    op2=TimeDistributed(layers.Conv1D(filters=1,kernel_size=6,padding='same'))(st)
-    op2=layers.Reshape((4,22))(op2)
-    op2=LSTM(units=64,return_sequences=True)(op2)
-    op2=Attention(method='cba')(op2)
-    #op2=concatenate([op2,se])
-
-    op=concatenate([op1,op2])
-    op=RepeatVector(1)(op)
-    op=TimeDistributed(Dense(22))(op)
-    op=TimeDistributed(layers.Activation('relu'))(op)
-    op=Flatten()(op)
-    model=Model(inputs=[lt,st,le,se],outputs=[op])
+    ip1=layers.Reshape((4,22,1,1))(lt)
+    op1=BatchNormalization()(ip1)
+    op1=layers.ConvLSTM2D(filters=64,kernel_size=(10,1),padding='same',return_sequences=True)(op1)
+    op1=Dropout(0.2)(op1)
+    op1=BatchNormalization()(op1)
+    op1=layers.ConvLSTM2D(filters=64,kernel_size=(5,1),padding='same',return_sequences=False)(op1)
+    op1=Dropout(0.1)(op1)
+    op1=BatchNormalization()(op1)
+    op1=Flatten()(op1)
+    op1=RepeatVector(1)(op1)
+    op1=layers.Reshape((1,22,1,64))(op1)
+    op1=layers.ConvLSTM2D(filters=64,kernel_size=(10,1),padding='same',return_sequences=True)(op1)
+    op1=Dropout(0.1)(op1)
+    op1=BatchNormalization()(op1)
+    op1=layers.ConvLSTM2D(filters=64,kernel_size=(5,1),padding='same',return_sequences=True)(op1)
+    op1=TimeDistributed(Dense(units=1,activation='relu'))(op1)
+    op1=Flatten()(op1)
+    op=op1
+    model=Model(inputs=[lt,st,le,se],outputs=op,name='mymodel')
     #compile model here,use default mae mape and mse ,when compare we can compute base on mse to get rmse
     model.compile(optimizer='adam',metrics=['mae','mape'],loss='mse')
     model.summary()
@@ -54,12 +55,12 @@ if __name__ == "__main__":
     x_test=[lt_test,st_test,le_test,se_test]
     y_train=op_train
     y_test=op_test
-
     #train model with custom-modelcheckpoint, earylstopping and reducelronplateau callback
     model=train_model(prefix,model,x_train,y_train,x_test,y_test,verbose=1)
     
     #load model from file or use the model trained by above function to predict
-    #   please compile the model and then load weight ,as it seems to be some bugs with the load model functions
+    #model=load_model('./'+prefix+'/'+'best_model.hdf5')
+    #   please compile the model and then load weight ,as it seems to be some bugs with the load model functions when custom layers existed
     #model.load_weights('./'+prefix+'/best_weight.hdf5')
     y_pred=model.predict(x_test)
     #use flatten data in case 1000 lines on a graph

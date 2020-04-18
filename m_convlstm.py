@@ -17,27 +17,33 @@ if __name__ == "__main__":
     
     from keras.models import Sequential,load_model,Model
     from keras import layers
-    from keras.layers import BatchNormalization,LSTM,Dropout,Dense,RepeatVector,Flatten,TimeDistributed,concatenate,Input
+    from keras.layers import BatchNormalization,LSTM,Dropout,Dense,RepeatVector,Flatten,TimeDistributed,concatenate,Input,ConvLSTM2D,Reshape
 
-    #build model here
+    #build model
     model=Sequential()
-    model.add(BatchNormalization(input_shape=(4,22)))
-    model.add(TimeDistributed(Dense(units=64)))
-    model.add(BatchNormalization())
-    model.add(TimeDistributed(Dense(units=64)))
+    model.add(BatchNormalization(name='bn0',input_shape=(4,22,1)))
+    model.add(Reshape((4,22,1,1)))
+    model.add(ConvLSTM2D(name='convlstm1',filters=64,kernel_size=(10,1),padding='same',return_sequences=True))
+    model.add(Dropout(0.2,name='dropout1'))
+    model.add(BatchNormalization(name='bn1'))
+    model.add(ConvLSTM2D(name='convlstm2',filters=64,kernel_size=(5,1),padding='same',return_sequences=False))
+    model.add(Dropout(0.1,name='dropout2'))
+    model.add(BatchNormalization(name='bn2'))
     model.add(Flatten())
     model.add(RepeatVector(1))
-    model.add(TimeDistributed(Dense(64)))
-    model.add(BatchNormalization())
-    model.add(TimeDistributed(Dense(22,activation='linear')))
+    model.add(Reshape((1,22,1,64)))
+    model.add(ConvLSTM2D(name='convlstm3',filters=64,kernel_size=(10,1),padding='same',return_sequences=True))
+    model.add(Dropout(0.1,name='dropout3'))
+    model.add(BatchNormalization(name='bn3'))
+    model.add(ConvLSTM2D(name='convlstm4',filters=64,kernel_size=(5,1),padding='same',return_sequences=True))
+    model.add(TimeDistributed(Dense(units=1,name='dense1',activation='relu')))
     model.add(Flatten())
-    #compile model here,use default mae mape and mse ,when compare we can compute base on mse to get rmse
+    #compile model
     model.compile(optimizer='adam',metrics=['mae','mape'],loss='mse')
     model.summary()
 
     #final process on preprocess data
-    st_train=st_train.squeeze()
-    st_test=st_test.squeeze()
+   
     #assign train:x,y;  test:x,y
     x_train=st_train
     x_test=st_test
