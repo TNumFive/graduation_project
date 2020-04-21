@@ -39,6 +39,7 @@ def prepare_data(forestep=32):
     print('y_train.shape:',y_train.shape)
     return x_train,x_test,y_train,y_test
 
+
 if __name__ == "__main__":
 
     #script will create dir called ./temp/${prefix} to store model,weight history and pred vs. true
@@ -47,52 +48,30 @@ if __name__ == "__main__":
     prefix='temp/'+prefix
 
     #generate data
-
+    #st_train,st_test,lt_train,lt_test,se_train,se_test,le_train,le_test,op_train,op_test=custom_scale3()
+    
     from keras.models import Sequential,load_model,Model
     from keras import layers
     from keras.layers import BatchNormalization,LSTM,Dropout,Dense,RepeatVector,Flatten,TimeDistributed,concatenate,Input
-    from attention import Attention
-    #build model here
-    input_timesteps=32
-    output_timesteps=1
-    num_links=20
-    model = Sequential()
-    model.add(BatchNormalization(name = 'batch_norm_0', input_shape = (input_timesteps, num_links)))
-    model.add(LSTM(name ='lstm_1',
-                   units = 64,
-                   return_sequences = True))
-    
-    model.add(Dropout(0.2, name = 'dropout_1'))
-    model.add(BatchNormalization(name = 'batch_norm_1'))
 
-    model.add(LSTM(name ='lstm_2',
-                   units = 64,
-                   return_sequences = False))
-    
-    model.add(Dropout(0.1, name = 'dropout_2'))
-    model.add(BatchNormalization(name = 'batch_norm_2'))
-    
-    model.add(RepeatVector(output_timesteps))
-    
-    model.add(LSTM(name ='lstm_3',
-                   units = 64,
-                   return_sequences = True))
-    
-    model.add(Dropout(0.1, name = 'dropout_3'))
-    model.add(BatchNormalization(name = 'batch_norm_3'))
-    
-    model.add(LSTM(name ='lstm_4',
-                   units = num_links,
-                   return_sequences = True))
-    
-    model.add(TimeDistributed(Dense(units=num_links, name = 'dense_1', activation = 'linear')))
+    #build model here
+    model=Sequential()
+    model.add(BatchNormalization(input_shape=(32,20)))
+    model.add(TimeDistributed(Dense(units=64)))
+    model.add(BatchNormalization())
+    model.add(TimeDistributed(Dense(units=64)))
+    model.add(Flatten())
+    model.add(RepeatVector(1))
+    model.add(TimeDistributed(Dense(64)))
+    model.add(BatchNormalization())
+    model.add(TimeDistributed(Dense(20,activation='linear')))
     model.add(Flatten())
     #compile model here,use default mae mape and mse ,when compare we can compute base on mse to get rmse
     model.compile(optimizer='adam',metrics=['mae','mape'],loss='mse')
     model.summary()
 
     #final process on preprocess data
-
+    
     #assign train:x,y;  test:x,y
     x_train,x_test,y_train,y_test=prepare_data()
     #train model with custom-modelcheckpoint, earylstopping and reducelronplateau callback
@@ -101,8 +80,7 @@ if __name__ == "__main__":
     #load model from file or use the model trained by above function to predict
     #model=load_model('./'+prefix+'/'+'best_model.hdf5')
     #   please compile the model and then load weight ,as it seems to be some bugs with the load model functions when custom layers existed
-    model.load_weights('./'+prefix+'/best_weight.hdf5')
+    #model.load_weights('./'+prefix+'/best_weight.hdf5')
     y_pred=model.predict(x_test)
     #use flatten data in case 1000 lines on a graph
     visualize_test(prefix,y_test.flatten(),y_pred.flatten())
-    

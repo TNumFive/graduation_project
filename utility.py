@@ -320,10 +320,10 @@ def train_model(
 def visualize_test(prefix:str,y_true,y_pred):#plot last day prediction
     prefix='./'+prefix+'/'
     pyplot.figure(figsize=(21,9))
-    pyplot.title('pred vs. true (last 80*22)')
-    if len(y_pred)>20*4*1*22:
-        y_pred=y_pred[-20*4*1*22+14::22]
-        y_true=y_true[-20*4*1*22+14::22]
+    pyplot.title('pred vs. true')
+    if len(y_true)>20*72:#just plot one sta of last day of pred data sipailou downflow sta_order=15
+        y_true=y_true[-20*72+14::20]
+        y_pred=y_pred[-20*72+14::20]
     pyplot.plot(y_true,label='y_true',linewidth=1)
     pyplot.plot(y_pred,label='y_pred',linewidth=1,linestyle='-')
     pyplot.legend()

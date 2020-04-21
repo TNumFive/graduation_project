@@ -1,5 +1,6 @@
 from utility import custom_scale2,custom_scale3,train_model,visualize_test
 from matplotlib import pyplot
+import pandas as pd
 import numpy as np
 import os
 import sys
@@ -52,4 +53,4 @@ if __name__ == "__main__":
     #model.load_weights('./'+prefix+'/best_weight.hdf5')
     y_pred=model.predict(x_test)
     #use flatten data in case 1000 lines on a graph
-    visualize_test(prefix,op_test.flatten(),y_pred.flatten())
+    visualize_test(prefix,y_test.flatten(),y_pred.flatten())

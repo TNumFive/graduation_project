@@ -122,15 +122,13 @@ def make_timeslot_oneday(data:pd.DataFrame,sta_order_start=1,sta_order_end=23,sl
             else:
                 sta_sum[so]=row[1]['sta_time']
                 sta_count[so]=1
-        for i in sta_sum.keys():#用平均法计算时隙内站点时间
+        for i in sta_sum.keys():#用平均法计算时隙内站点时间,round 控制小数位数
             sta_sum[i]=round(sta_sum[i]*1.0/sta_count[i],2)
         if len(sta_sum.keys())>0:#该时隙没有key代表该时隙为空
             sta_sum['start_time']=date_day+start_str#添加时隙标签
             oneday=oneday.append(sta_sum,ignore_index=True)
-        print('\tworking on:',date_day+start_str,'\r',end='')
+        print('\twork done:',date_day+start_str,'\r',end='')
     #print(' ')
-    start_time=oneday.pop('start_time')#调整时间位置
-    oneday.insert(0,'start_time',start_time)
     return oneday
 
 def make_timeslot(data:pd.DataFrame)->pd.DataFrame:
@@ -152,6 +150,9 @@ def make_timeslot(data:pd.DataFrame)->pd.DataFrame:
             oneday=make_timeslot_oneday(oneday)#获得当天的timeslot信息
             timeslot=timeslot.append(oneday,ignore_index=True)
     print('')
+    timeslot.sort_index(axis=1,inplace=True)
+    start_time=timeslot.pop('start_time')#调整时间位置
+    timeslot.insert(0,'start_time',start_time)
     timeslot.to_csv('tt_timeslot.csv',index=False)
     return timeslot
 def timeslot_analyse(data:pd.DataFrame,sta_order_start=1,sta_order_end=23,slot_length=15):
@@ -241,7 +242,7 @@ def prepare_dataset(data:pd.DataFrame,slot_length=15):
         for i in range(1,len(r[1])):
             if r[1][i]<=0:
                 data.at[r[0],r[1].keys()[i]]=data.iloc[r[0]-1][r[1].keys()[i]]
-    data.to_csv('dataset.csv',index=False)
+    data.to_csv('tt_dataset.csv',index=False)
     #现在处理成与客流数据相对应，且无缺失，所有时隙都在的数据了/xk
     #处理一下完整版的multi-output和STDN模型
     return data
