@@ -186,7 +186,7 @@ def prepare_dataset(data:pd.DataFrame,slot_length=15):
     data.fillna(method='ffill',inplace=True)
     data.fillna(method='bfill',inplace=True)
     #去除站序1，2，3，选择时隙05：15：00-23：00：00
-    #选择12月1号到30号为止，1月11号开始3月20号为止的数据
+    #选择12月1号到30号为止，1月11号开始3月20号为止的数据,因为其他时段缺少客流数据
     data.drop(columns=['02','03'],inplace=True)
     d181201=pd.to_datetime('2018-12-01 05:15:00')
     d181230=pd.to_datetime('2018-12-30 23:00:00')

@@ -124,11 +124,62 @@ def make_timeslot(data:pd.DataFrame,slot_length=15)->pd.DataFrame:
     timeslot.to_csv('pf_timeslot.csv',index=False)
     return timeslot
 
+def prepare_dataset(data:pd.DataFrame,slot_length=15)->pd.DataFrame:
+    data.set_index(['start_time'],drop=False,inplace=True)
+    data.drop(columns=['01','02','03'],inplace=True)#cause o1-03 has been droped in tt data
+    data=data.between_time('05:15:00','23:00:00')
+    #fill up possible timeslot loss
+    d181201=pd.to_datetime('2018-12-01 05:15:00')
+    d181230=pd.to_datetime('2018-12-30 23:00:00')
+    d190111=pd.to_datetime('2019-01-11 05:15:00')
+    d190131=pd.to_datetime('2019-01-31 23:00:00')
+    d190301=pd.to_datetime('2019-03-01 05:15:00')
+    d190320=pd.to_datetime('2019-03-20 23:00:00')
+    index_data=data.loc[:,'start_time']
+    daysta=d181201
+    while daysta<=d181230:
+        time=daysta
+        dayend=str(daysta).replace('05:15:00','23:00:00')
+        dayend=pd.to_datetime(dayend)
+        daysta=daysta+pd.Timedelta(days=1)
+        while time<=dayend:
+            if time not in index_data:
+                data=data.append({'start_time':time},ignore_index=True)
+                #print(time)
+            time+=pd.Timedelta(minutes=slot_length)
+    daysta=d190111
+    while daysta<=d190131:
+        time=daysta
+        dayend=str(daysta).replace('05:15:00','23:00:00')
+        dayend=pd.to_datetime(dayend)
+        daysta=daysta+pd.Timedelta(days=1)
+        while time<=dayend:
+            if time not in index_data:
+                data=data.append({'start_time':time},ignore_index=True)
+                #print(time)
+            time+=pd.Timedelta(minutes=slot_length)
+    daysta=d190301
+    while daysta<=d190320:
+        time=daysta
+        dayend=str(daysta).replace('05:15:00','23:00:00')
+        dayend=pd.to_datetime(dayend)
+        daysta=daysta+pd.Timedelta(days=1)
+        while time<=dayend:
+            if time not in index_data:
+                data=data.append({'start_time':time},ignore_index=True)
+                #print(time)
+            time+=pd.Timedelta(minutes=slot_length)
+    data.sort_values(['start_time'],inplace=True,ignore_index=True)
+    data.fillna(value=0,inplace=True)
+    data.to_csv('pf_dataset.csv',index=False)
+    return data
+
 if __name__ == "__main__":
     print('process_data')
     #extract_2_downflow()
     #merge_pf()
     #calculate_pf()
-    data=pd.read_csv('pf_calculated.csv',parse_dates=['sum_time'])
-    data=make_timeslot(data)
-    data.to_csv('pf_dataset.csv',index=False)
+    #data=pd.read_csv('pf_calculated.csv',parse_dates=['sum_time'])
+    #data=make_timeslot(data)
+    data=pd.read_csv('pf_timeslot.csv',parse_dates=['start_time'])
+    prepare_dataset(data)
