@@ -68,39 +68,61 @@ def prepare_data_pf(forestep=32):
     print('y_train.shape:',y_train.shape)
     return x_train,x_test,y_train,y_test
 
-def prepare_data_ttpf(forestep=8,foreday=3,slot_length=15):
+def prepare_data_ttpf(slot_length=15):
     from sklearn.preprocessing import MinMaxScaler
 
-    ttdataset=pd.read_csv('./data/tt_dataset.csv',parse_dates=['start_time'])
-    ttdataset.set_index(['start_time'],inplace=True)
-    pfdataset=pd.read_csv('./data/pf_dataset.csv',parse_dates=['start_time'])
-    pfdataset.set_index(['start_time'],inplace=True)
-    
-    len_dataset=len(ttdataset)
-    splitpoint=int(0.7*len_dataset)
+    ttdataset=pd.read_csv('./data/tt_dataset_mymodel.csv',parse_dates=['start_time'])
+    pfdataset=pd.read_csv('./data/pf_dataset_mymodel.csv',parse_dates=['start_time'])
+
+    index_tt=ttdataset.pop('start_time')
+    index_pf=pfdataset.pop('start_time')
+    weekday=pd.DataFrame()
+    for i in range(0,len(index_tt)):
+        time=index_tt[i]
+        weekday.at[i,'weekday']=time.weekday()
+        print('\r\t',i,'/',len(index_tt),end='')
+    print('')
+    weekday=weekday.to_numpy().reshape((int(len(ttdataset)/37),37,1))
+    ttdataset=ttdataset.to_numpy().reshape((int(len(ttdataset)/37),37,20))
+    pfdataset=pfdataset.to_numpy().reshape((int(len(pfdataset)/37),37,20))
+    split=int(ttdataset.shape[0]*0.7)
     
     ttmms=MinMaxScaler()
-    tt_train=ttdataset.to_numpy()[:splitpoint].flatten().reshape(-1,1)
-    tt_test=ttdataset.to_numpy()[splitpoint:].flatten().reshape(-1,1)
+    tt_train=ttdataset[:split,:].flatten().reshape((-1,1))
+    tt_test=ttdataset[split:,:].flatten().reshape((-1,1))
     tt_train=ttmms.fit_transform(tt_train)
     tt_test=ttmms.transform(tt_test)
-    tt_train=tt_train.reshape((int(len(tt_train)/20),20,1))
-    tt_test=tt_test.reshape((int(len(tt_test)/20),20,1))
+    tt_train=tt_train.reshape((split,37,20))
+    tt_test=tt_test.reshape((len(ttdataset)-split,37,20))
 
     pfmms=MinMaxScaler()
-    pf_train=pfdataset.to_numpy()[:splitpoint].flatten().reshape(-1,1)
-    pf_test=pfdataset.to_numpy()[splitpoint:].flatten().reshape(-1,1)
+    pf_train=ttdataset[:split,:].flatten().reshape((-1,1))
+    pf_test=ttdataset[split:,:].flatten().reshape((-1,1))
     pf_train=pfmms.fit_transform(pf_train)
     pf_test=pfmms.transform(pf_test)
-    pf_train=pf_train.reshape((int(len(pf_train)/20),20,1))
-    pf_test=pf_test.reshape((int(len(pf_test)/20),20,1))
+    pf_train=pf_train.reshape((split,37,20))
+    pf_test=pf_test.reshape((len(ttdataset)-split,37,20))
     
-    print(pf_train.shape,pf_test.shape,tt_train.shape,tt_test.shape)
-    train=np.concatenate((tt_train,pf_train),axis=-1)
-    print(train.shape)
+    print(weekday.shape)
+    print(index_tt[0])
+    print(tt_train.shape)
+    print(index_pf[0])
+    print(pf_train.shape)
+    data={
+        'weekday':weekday,
+        'tt_train':tt_train,
+        'tt_test':tt_test,
+        'ttmms':ttmms,
+        'pf_train':pf_train,
+        'pf_test':pf_test,
+        'pfmms':pfmms
+    }
+    return data
 
-
-def prepare_data_mm(filepath:str):
+def prepare_data_mm(filepath:str,savepath:str,is_tt=1):
+    #预测第d天的t，t+1时隙
+    #长期依赖 d-3，d-2，d-1天的 t-4～t+4时隙
+    #短期依赖 d天t-8～t-1时隙
     from datetime import datetime
     rawdata=pd.read_csv(filepath,parse_dates=['start_time'])
     rawdata.set_index(['start_time'],inplace=True,drop=False)
@@ -127,8 +149,11 @@ def prepare_data_mm(filepath:str):
                         part=part.append(rawdata.loc[temp,:],ignore_index=True)
                     else:
                         part=part.append({'start_time':temp},ignore_index=True)
-                part.fillna(method='bfill',inplace=True)
-                part.fillna(method='ffill',inplace=True)
+                if is_tt:
+                    part.fillna(method='bfill',inplace=True)
+                    part.fillna(method='ffill',inplace=True)
+                else:
+                    part.fillna(value=0,inplace=True)
                 dataset=dataset.append(part,ignore_index=True)
             part=pd.DataFrame()
             for k in range(-8,1):
@@ -144,13 +169,19 @@ def prepare_data_mm(filepath:str):
                     part=part.append(rawdata.loc[temp,:],ignore_index=True)
                 else:
                     part=part.append({'start_time':temp},ignore_index=True)
-            part.fillna(method='ffill',inplace=True)
+            if is_tt:
+                part.fillna(method='ffill',inplace=True)
+            else:
+                part.fillna(value=0,inplace=True)
             dataset=dataset.append(part,ignore_index=True)
         print('\r\t',st,end='')
     print('')
     print(datetime.now()-clock)
-    dataset.to_csv('./data/test.csv',index=False)
+    dataset.to_csv(savepath,index=False)
 
 if __name__ == "__main__":
+    prefix=os.path.basename(sys.argv[0])
+    print(prefix)
     #prepare_data_ttpf()    
-    prepare_data_mm('./data/tt_dataset.csv')
+    #prepare_data_mm('./data/pf_dataset.csv','./data/pf_dataset_mymodel.csv',0)
+    prepare_data_ttpf()

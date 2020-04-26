@@ -1,6 +1,7 @@
 #manual setting
 temp/*
 data/*.csv
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
