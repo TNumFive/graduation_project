@@ -248,7 +248,7 @@ def prepare_dataset(data:pd.DataFrame,slot_length=15):
     #处理一下完整版的multi-output和STDN模型
     return data
         
-def analyse(data:pd.DataFrame,sta_order_start=4,sta_order_end=23):
+def analyse1(data:pd.DataFrame,sta_order_start=4,sta_order_end=23):
     data.sort_values(['arrival'],inplace=True,ignore_index=True)
     data.query('sta_order>=@sta_order_start',inplace=True)
     data.query('sta_order<=@sta_order_end',inplace=True)
@@ -264,6 +264,19 @@ def analyse(data:pd.DataFrame,sta_order_start=4,sta_order_end=23):
     print('')
     print('average time for one trip is :',total/counter)
 
+def analyse2(data:pd.DataFrame,sta_order_start=4,sta_order_end=23):
+    data.query('sta_order>=@sta_order_start',inplace=True)
+    data.query('sta_order<=@sta_order_end',inplace=True)
+    total=0
+    counter=0
+    for row in data.iterrows():
+        if row[1]['trip_time']!=0:
+            total+=row[1]['trip_time']
+            counter+=1
+        print('\r\t',row[0])
+    print('')
+    print('average trip time per sta in all time is:',total/counter,'s')
+
 if __name__ == "__main__":
     print('process_tt_data')
     '''
@@ -277,6 +290,9 @@ if __name__ == "__main__":
     #timeslot_analyse(data,sta_order_start=2)
     data=prepare_dataset(data)
     timeslot_analyse(data,sta_order_start=4)
-    '''
+    
     data=pd.read_csv('tt_add_order.csv',parse_dates=['arrival'])
-    analyse(data)
+    analyse1(data)
+    '''
+    data=pd.read_csv('tt_add_travel_time.csv',parse_dates=['arrival'])
+    analyse2(data)
