@@ -1,6 +1,6 @@
 from utility import ConfigStruct,train_model
 from model import example_model,convlstm
-from prepare_data import prepare_data_pf
+from prepare_data import prepare_data_tt
 from matplotlib import pyplot
 import pandas as pd
 import numpy as np
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     #create model with settings from cofig
     model=convlstm(config)
     #generate data 
-    x_train,x_test,y_train,y_test=prepare_data_pf()
+    x_train,x_test,y_train,y_test=prepare_data_tt()
     #train model
     model=train_model(config,model,x_train,y_train,x_test,y_test)
     #visualize predict

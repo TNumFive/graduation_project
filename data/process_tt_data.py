@@ -155,6 +155,7 @@ def make_timeslot(data:pd.DataFrame)->pd.DataFrame:
     timeslot.insert(0,'start_time',start_time)
     timeslot.to_csv('tt_timeslot.csv',index=False)
     return timeslot
+
 def timeslot_analyse(data:pd.DataFrame,sta_order_start=1,sta_order_end=23,slot_length=15):
     start=pd.Timedelta(minutes=0)
     maxtime=pd.Timedelta(days=1)
@@ -247,6 +248,22 @@ def prepare_dataset(data:pd.DataFrame,slot_length=15):
     #处理一下完整版的multi-output和STDN模型
     return data
         
+def analyse(data:pd.DataFrame,sta_order_start=4,sta_order_end=23):
+    data.sort_values(['arrival'],inplace=True,ignore_index=True)
+    data.query('sta_order>=@sta_order_start',inplace=True)
+    data.query('sta_order<=@sta_order_end',inplace=True)
+    sta=data.drop_duplicates(['trip_id'],keep='first',ignore_index=True)
+    end=data.drop_duplicates(['trip_id'],keep='last',ignore_index=True)
+    total=pd.Timedelta(minutes=0)
+    counter=0
+    for i in range(0,len(sta)):
+        if sta.at[i,'sta_order']==sta_order_start and end.at[i,'sta_order']==sta_order_end:
+            total+=(end.at[i,'arrival']-sta.at[i,'arrival'])
+            counter+=1
+        print('\r\tworking on:',i,'/',len(sta),end='')
+    print('')
+    print('average time for one trip is :',total/counter)
+
 if __name__ == "__main__":
     print('process_tt_data')
     '''
@@ -255,8 +272,11 @@ if __name__ == "__main__":
     data=add_travel_time(data)
     data=pd.read_csv('tt_add_travel_time.csv',parse_dates=['arrival'])
     data=make_timeslot(data)
-    '''
+    
     data=pd.read_csv('tt_timeslot.csv',parse_dates=['start_time'])
     #timeslot_analyse(data,sta_order_start=2)
     data=prepare_dataset(data)
     timeslot_analyse(data,sta_order_start=4)
+    '''
+    data=pd.read_csv('tt_add_order.csv',parse_dates=['arrival'])
+    analyse(data)
