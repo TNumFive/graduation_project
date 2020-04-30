@@ -10,6 +10,7 @@ from keras import Model
 from keras import models
 from keras import backend as K
 from keras import callbacks
+from keras.utils import plot_model
 from sklearn.preprocessing import MinMaxScaler,OneHotEncoder
 from sklearn.metrics import mean_absolute_error,mean_squared_error
 
@@ -87,6 +88,47 @@ def STDN_like(
 
     return model
 
+def STDN_like2(
+    name='STDN_like2',
+    sta_num=20,
+    lt_shape=(3,9,20),
+    st_shape=(8,20),
+    wd_shape=(4,1),
+    op_shape=(1,20),
+    optimizer='adam',
+    metrics=['mae'],
+    loss='mse'
+)->Model:
+    lt=layers.Input(shape=lt_shape)
+    st=layers.Input(shape=st_shape)
+    wd=layers.Input(shape=wd_shape)
+
+    y1=layers.Reshape((lt_shape[0]*lt_shape[1],lt_shape[2],1))(lt)
+    y1=layers.TimeDistributed(layers.Conv1D(filters=64,kernel_size=10,padding='same'))(y1)
+    y1=layers.LeakyReLU()(y1)
+    y1=layers.TimeDistributed(layers.Conv1D(filters=64,kernel_size=5,padding='same'))(y1)
+    y1=layers.Activation('relu')(y1)
+    y1=layers.Activation('sigmoid')(y1)
+
+    y2=layers.Reshape((st_shape[0],st_shape[1],1))(st)
+    y2=layers.TimeDistributed(layers.Conv1D(filters=64,kernel_size=10,padding='same'))(y2)
+    y2=layers.LeakyReLU()(y2)
+    y2=layers.TimeDistributed(layers.Conv1D(filters=64,kernel_size=5,padding='same'))(y2)
+    y2=layers.Activation('relu')(y2)
+    y2=layers.Activation('sigmoid')(y2)
+
+    y=layers.concatenate([y1,y2],axis=1)
+    y=layers.Reshape((lt_shape[0]*lt_shape[1]+st_shape[0],sta_num*64))(y)
+    y=layers.LSTM(64,return_sequences=True)(y)
+    y=layers.AlphaDropout(0.2)(y)
+    y=layers.LSTM(64,return_sequences=True)(y)
+    y=layers.AlphaDropout(0.1)(y)
+    y=attention_layer()(y)
+    y=layers.Dense(op_shape[0]*op_shape[1])(y)
+    model=Model(inputs=[lt,st,wd],outputs=[y],name=name)
+    model.compile(optimizer=optimizer,metrics=metrics,loss=loss)
+
+    return model
 
 def onehot_external_features(filepath='weather.csv')->(dict,dict):
     ef=pd.read_csv(filepath,parse_dates=['date'])
@@ -115,7 +157,7 @@ def onehot_external_features(filepath='weather.csv')->(dict,dict):
 def preprocess_data(
     filepath='tt_dataset.csv',
     savepath='tt_dataset_STDN_like.csv',
-    is_tt=1,
+    #is_tt=1,
     #sta_num=20,
     slot_length=15,
     lt_shape=(3,9,20),
@@ -202,7 +244,7 @@ def preprocess_data(
         print('time consumed:',datetime.now()-clock)
     return data
 
-def generate_data(
+def generate_data1(
     sta_num=20,
     slot_length=15,
     lt_shape=(3,9,20),
@@ -284,7 +326,7 @@ def generate_data(
             ef_list+=wd_dict[ef.at[ts.date(),'wd']]
             ef_list.append(ef.at[ts.date(),'wf'])
         print('\r\tdone',i+1,'/',len_start_time,end='')
-    print('\tdone',len_start_time,'/',len_start_time)
+    print('\r\tdone',len_start_time,'/',len_start_time)
     weekday=np.array(weekday).reshape((
         tt.shape[0],lt_shape[0]+1,1  
     ))
@@ -314,50 +356,254 @@ def generate_data(
     data['ef_test']=ef[spilitpoint:]
 
     return data
+
+def generate_data2(
+    sta_num=20,
+    slot_length=15,
+    lt_shape=(3,9,20),
+    st_shape=(8,20),
+    wd_shape=(4,1),
+    op_shape=(1,20),
+    spilitratio=0.7
+):
+    print('generate data')
+    tt=preprocess_data(filepath='tt_dataset.csv',savepath='tt_dataset_STDN_like.csv')
+    pf=preprocess_data(filepath='pf_dataset.csv',savepath='pf_dataset_STDN_like.csv')#thr original only model ttdata
+    assert len(tt)==len(pf)
+
+    start_time=tt.pop('start_time')
+    tt=tt.to_numpy().reshape((
+        int(len(start_time)/(lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0])),
+        lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0],
+        sta_num
+    ))
+    spilitpoint=int(spilitratio*tt.shape[0])
+    train_tt=tt[:spilitpoint]
+    test_tt=tt[spilitpoint:]
     
-#if __name__ == "__main__":
-#%matplotlib inline
-print('MultiOutput_model')
-print("\tDon't forget to\033[1;31m uncomment the %matplotlib inline \033[0m")
-print("\tDon't forget to\033[1;31m edit the epochs to 2000 when testing \033[0m")
-data=generate_data()
-#print(data['st_train_tt'].shape)
-x_train=[data['lt_train_tt'],data['st_train_tt'],data['wd_train']]
-y_train=data['y_train_tt'].squeeze()
-x_test=[data['lt_test_tt'],data['st_test_tt'],data['wd_test']]
-y_test=data['y_test_tt'].squeeze()
-mms_tt=data['mms_tt']
+    start_time=pf.pop('start_time')
+    pf=pf.to_numpy().reshape((
+        int(len(start_time)/(lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0])),
+        lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0],
+        sta_num
+    ))
+    spilitpoint=int(spilitratio*pf.shape[0])
+    train_pf=pf[:spilitpoint]
+    test_pf=pf[spilitpoint:]
+    
+    print('generate external features')
+    weather_dict,wd_dict=onehot_external_features()#
+    ef=pd.read_csv('weather.csv',parse_dates=['date'])
+    ef.set_index(['date'],inplace=True)
+    weekday=list()
+    ef_list=list()
+    len_start_time=len(start_time)
+    for i in range(0,len_start_time,lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0]):
+        for j in range(0,lt_shape[0]*lt_shape[1]+st_shape[0],9):
+            ts:pd.Timestamp=start_time[i+j]
+            if ts.weekday()>=5:
+                weekday.append(1)
+            else:
+                weekday.append(0)
+            ef_list.append(ef.at[ts.date(),'AQI'])
+            ef_list+=weather_dict[ef.at[ts.date(),'dw']]
+            ef_list+=weather_dict[ef.at[ts.date(),'nw']]
+            ef_list.append(ef.at[ts.date(),'ht'])
+            ef_list.append(ef.at[ts.date(),'lt'])
+            ef_list+=wd_dict[ef.at[ts.date(),'wd']]
+            ef_list.append(ef.at[ts.date(),'wf'])
+        print('\r\tdone',i+1,'/',len_start_time,end='')
+    print('\r\tdone',len_start_time,'/',len_start_time)
+    weekday=np.array(weekday).reshape((
+        tt.shape[0],lt_shape[0]+1,1  
+    ))
+    ef=np.array(ef_list).reshape((
+        tt.shape[0],lt_shape[0]+1,int(len(ef_list)/(tt.shape[0]*(lt_shape[0]+1)))
+    ))
+    data=dict()
+    data['lt_train_tt']=train_tt[:,:lt_shape[0]*lt_shape[1]].reshape((-1,lt_shape[0],lt_shape[1],lt_shape[2]))
+    data['st_train_tt']=train_tt[:,lt_shape[0]*lt_shape[1]:lt_shape[0]*lt_shape[1]+st_shape[0]]
+    data['y_train_tt']=train_tt[:,int(0-op_shape[0]):]
+    data['lt_test_tt']=test_tt[:,:lt_shape[0]*lt_shape[1]].reshape((-1,lt_shape[0],lt_shape[1],lt_shape[2]))
+    data['st_test_tt']=test_tt[:,lt_shape[0]*lt_shape[1]:lt_shape[0]*lt_shape[1]+st_shape[0]]
+    data['y_test_tt']=test_tt[:,int(0-op_shape[0]):]
+    
+    data['lt_train_pf']=train_pf[:,:lt_shape[0]*lt_shape[1]].reshape((-1,lt_shape[0],lt_shape[1],lt_shape[2]))
+    data['st_train_pf']=train_pf[:,lt_shape[0]*lt_shape[1]:lt_shape[0]*lt_shape[1]+st_shape[0]]
+    data['y_train_pf']=train_pf[:,int(0-op_shape[0]):]
+    data['lt_test_pf']=test_pf[:,:lt_shape[0]*lt_shape[1]].reshape((-1,lt_shape[0],lt_shape[1],lt_shape[2]))
+    data['st_test_pf']=test_pf[:,lt_shape[0]*lt_shape[1]:lt_shape[0]*lt_shape[1]+st_shape[0]]
+    data['y_test_pf']=test_pf[:,int(0-op_shape[0]):]
 
-model=STDN_like()
-earlystop=callbacks.EarlyStopping(patience=20,restore_best_weights=True)
-checkpoint=callbacks.ModelCheckpoint(model.name+'.hdf5',save_best_only=True)
-callback_list=[earlystop,checkpoint]
-clock=datetime.datetime.now()
-print('Training:',model.name,'start at:',clock)
-print_log('\n'+model.name+' start at:'+str(clock))
-model.summary(print_fn=print_log)
-history=model.fit(x_train,y_train,batch_size=16,epochs=2000,callbacks=callback_list,validation_data=[x_test,y_test])
-model.save_weights(model.name+'_weight.hdf5')
-time_consumed=str(datetime.datetime.now()-clock)
-print('Training done!!!','time consumed:',time_consumed)
-print_log('time consumed:'+time_consumed)
+    data['wd_train']=weekday[:spilitpoint]
+    data['wd_test']=weekday[spilitpoint:]
+    data['ef_train']=ef[:spilitpoint]
+    data['ef_test']=ef[spilitpoint:]
 
-pyplot.Figure()
-pyplot.title('Metrics')
-pyplot.xlabel('epoch')
-pyplot.plot(history.history['loss'],label='loss',color='r',linestyle=':',linewidth=1.0)
-pyplot.plot(history.history['val_loss'],label='val_loss',color='r',linestyle='-',linewidth=1.0)
-pyplot.legend()
-pyplot.show()
-pyplot.savefig(model.name+'_loss.png')
+    return data
 
-y_pred=model.predict(x_test)
-y_true=mms_tt.inverse_transform(y_test.reshape((-1,1))).flatten()
-y_pred=mms_tt.inverse_transform(y_pred.reshape((-1,1))).flatten()
-mse=mean_squared_error(y_true,y_pred)
-mae=mean_absolute_error(y_true,y_pred)
-print_log(model.name+' mse: '+str(mse))
-print_log(model.name+' mae: '+str(mae))
-print_log('\n')
-print(model.name,'mse:',mse)
-print(model.name,'mae:',mae)
+def generate_data(
+    sta_num=20,
+    tt_slot_length=15,
+    pf_slot_length=15,
+    lt_shape=(3,9,20),
+    st_shape=(8,20),
+    wd_shape=(4,1),
+    op_shape=(1,20),
+    spilitratio=0.7,
+    do_MinMax=True
+):
+    print('generate data')
+    tt=preprocess_data(filepath='tt_dataset.csv',savepath='tt_dataset_STDN_like.csv',
+        slot_length=tt_slot_length,lt_shape=lt_shape,st_shape=st_shape,wd_shape=wd_shape,op_shape=op_shape
+    )
+    pf=preprocess_data(filepath='pf_dataset.csv',savepath='pf_dataset_STDN_like.csv',
+        slot_length=pf_slot_length,lt_shape=lt_shape,st_shape=st_shape,wd_shape=wd_shape,op_shape=op_shape
+    )#thr original only model ttdata
+    assert len(tt)==len(pf)
+
+    start_time=tt.pop('start_time')
+    tt=tt.to_numpy().reshape((
+        int(len(start_time)/(lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0])),
+        lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0],
+        sta_num
+    ))
+    spilitpoint=int(spilitratio*tt.shape[0])
+    train_tt=tt[:spilitpoint].reshape((-1,1))
+    test_tt=tt[spilitpoint:].reshape((-1,1))
+    mms_tt=MinMaxScaler()
+    train_tt:np.ndarray=mms_tt.fit_transform(train_tt)
+    train_tt=train_tt.reshape((
+        spilitpoint,
+        lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0],
+        sta_num
+    ))
+    test_tt:np.ndarray=mms_tt.transform(test_tt)
+    test_tt=test_tt.reshape((
+        tt.shape[0]-spilitpoint,
+        lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0],
+        sta_num
+    ))
+    
+    start_time=pf.pop('start_time')
+    pf=pf.to_numpy().reshape((
+        int(len(start_time)/(lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0])),
+        lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0],
+        sta_num
+    ))
+    spilitpoint=int(spilitratio*pf.shape[0])
+    train_pf=pf[:spilitpoint].reshape((-1,1))
+    test_pf=pf[spilitpoint:].reshape((-1,1))
+    mms_pf=MinMaxScaler()
+    train_pf:np.ndarray=mms_pf.fit_transform(train_pf)
+    train_pf=train_pf.reshape((
+        spilitpoint,
+        lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0],
+        sta_num
+    ))
+    test_pf:np.ndarray=mms_pf.transform(test_pf)
+    test_pf=test_pf.reshape((
+        pf.shape[0]-spilitpoint,
+        lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0],
+        sta_num
+    ))
+    
+    print('generate external features')
+    weather_dict,wd_dict=onehot_external_features()#
+    ef=pd.read_csv('weather.csv',parse_dates=['date'])
+    ef.set_index(['date'],inplace=True)
+    weekday=list()
+    ef_list=list()
+    len_start_time=len(start_time)
+    for i in range(0,len_start_time,lt_shape[0]*lt_shape[1]+st_shape[0]+op_shape[0]):
+        for j in range(0,lt_shape[0]*lt_shape[1]+st_shape[0],9):
+            ts:pd.Timestamp=start_time[i+j]
+            if ts.weekday()>=5:
+                weekday.append(1)
+            else:
+                weekday.append(0)
+            ef_list.append(ef.at[ts.date(),'AQI'])
+            ef_list+=weather_dict[ef.at[ts.date(),'dw']]
+            ef_list+=weather_dict[ef.at[ts.date(),'nw']]
+            ef_list.append(ef.at[ts.date(),'ht'])
+            ef_list.append(ef.at[ts.date(),'lt'])
+            ef_list+=wd_dict[ef.at[ts.date(),'wd']]
+            ef_list.append(ef.at[ts.date(),'wf'])
+        print('\r\tdone',i+1,'/',len_start_time,end='')
+    print('\r\tdone',len_start_time,'/',len_start_time)
+    weekday=np.array(weekday).reshape((
+        tt.shape[0],lt_shape[0]+1,1  
+    ))
+    ef=np.array(ef_list).reshape((
+        tt.shape[0],lt_shape[0]+1,int(len(ef_list)/(tt.shape[0]*(lt_shape[0]+1)))
+    ))
+    data=dict()
+    data['lt_train_tt']=train_tt[:,:lt_shape[0]*lt_shape[1]].reshape((-1,lt_shape[0],lt_shape[1],lt_shape[2]))
+    data['st_train_tt']=train_tt[:,lt_shape[0]*lt_shape[1]:lt_shape[0]*lt_shape[1]+st_shape[0]]
+    data['y_train_tt']=train_tt[:,int(0-op_shape[0]):]
+    data['lt_test_tt']=test_tt[:,:lt_shape[0]*lt_shape[1]].reshape((-1,lt_shape[0],lt_shape[1],lt_shape[2]))
+    data['st_test_tt']=test_tt[:,lt_shape[0]*lt_shape[1]:lt_shape[0]*lt_shape[1]+st_shape[0]]
+    data['y_test_tt']=test_tt[:,int(0-op_shape[0]):]
+    data['mms_tt']=mms_tt
+    
+    data['lt_train_pf']=train_pf[:,:lt_shape[0]*lt_shape[1]].reshape((-1,lt_shape[0],lt_shape[1],lt_shape[2]))
+    data['st_train_pf']=train_pf[:,lt_shape[0]*lt_shape[1]:lt_shape[0]*lt_shape[1]+st_shape[0]]
+    data['y_train_pf']=train_pf[:,int(0-op_shape[0]):]
+    data['lt_test_pf']=test_pf[:,:lt_shape[0]*lt_shape[1]].reshape((-1,lt_shape[0],lt_shape[1],lt_shape[2]))
+    data['st_test_pf']=test_pf[:,lt_shape[0]*lt_shape[1]:lt_shape[0]*lt_shape[1]+st_shape[0]]
+    data['y_test_pf']=test_pf[:,int(0-op_shape[0]):]
+    data['mms_pf']=mms_pf
+
+    data['wd_train']=weekday[:spilitpoint]
+    data['wd_test']=weekday[spilitpoint:]
+    data['ef_train']=ef[:spilitpoint]
+    data['ef_test']=ef[spilitpoint:]
+
+    return data
+
+if __name__ == "__main__":
+    #%matplotlib inline
+    print('MultiOutput_model')
+    print("\tDon't forget to\033[1;31m uncomment the %matplotlib inline \033[0m")
+    print("\tDon't forget to\033[1;31m edit the epochs to 2000 when testing \033[0m")
+    data=generate_data1()
+    #print(data['st_train_tt'].shape)
+    x_train=[data['lt_train_tt'],data['st_train_tt'],data['wd_train']]
+    y_train=data['y_train_tt'].squeeze()
+    x_test=[data['lt_test_tt'],data['st_test_tt'],data['wd_test']]
+    y_test=data['y_test_tt'].squeeze()
+    mms_tt=data['mms_tt']
+
+    model=STDN_like2()
+    earlystop=callbacks.EarlyStopping(patience=20,restore_best_weights=True)
+    checkpoint=callbacks.ModelCheckpoint(model.name+'.hdf5',save_best_only=True)
+    callback_list=[earlystop,checkpoint]
+    clock=datetime.datetime.now()
+    print('Training:',model.name,'start at:',clock)
+    print_log('\n'+model.name+' start at:'+str(clock))
+    model.summary(print_fn=print_log)
+    history=model.fit(x_train,y_train,batch_size=16,epochs=2,callbacks=callback_list,validation_data=[x_test,y_test])
+    model.save_weights(model.name+'_weight.hdf5')
+    time_consumed=str(datetime.datetime.now()-clock)
+    print('Training done!!!','Time consumed:',time_consumed)
+    print_log('Time consumed:'+time_consumed)
+
+    pyplot.Figure()
+    pyplot.title('Metrics')
+    pyplot.xlabel('epoch')
+    pyplot.plot(history.history['loss'],label='loss',color='r',linestyle=':',linewidth=1.0)
+    pyplot.plot(history.history['val_loss'],label='val_loss',color='r',linestyle='-',linewidth=1.0)
+    pyplot.legend()
+    pyplot.show()
+    pyplot.savefig(model.name+'_loss.png')
+
+    y_pred=model.predict(x_test)
+    y_true=mms_tt.inverse_transform(y_test.reshape((-1,1))).flatten()
+    y_pred=mms_tt.inverse_transform(y_pred.reshape((-1,1))).flatten()
+    mse=mean_squared_error(y_true,y_pred)
+    mae=mean_absolute_error(y_true,y_pred)
+    print_log(model.name+' mse: '+str(mse))
+    print_log(model.name+' mae: '+str(mae))
+    print_log('\n')
+    print(model.name,'mse:',mse)
+    print(model.name,'mae:',mae)
