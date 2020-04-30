@@ -2,6 +2,8 @@
 temp/*
 data/*.csv
 *.csv
+*.hdf5
+*.h5
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

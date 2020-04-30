@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import os
+from matplotlib import pyplot
 
 def extract(file_name:str,route_name:str)->pd.DataFrame:
     inout=pd.read_csv(file_name,encoding='gbk',parse_dates=['到站时间'])
@@ -255,27 +256,61 @@ def analyse1(data:pd.DataFrame,sta_order_start=4,sta_order_end=23):
     sta=data.drop_duplicates(['trip_id'],keep='first',ignore_index=True)
     end=data.drop_duplicates(['trip_id'],keep='last',ignore_index=True)
     total=pd.Timedelta(minutes=0)
+    below_20=0
+    below_30=0
+    below_40=0
+    below_50=0
+    other=0
     counter=0
+    trend=[]
     for i in range(0,len(sta)):
         if sta.at[i,'sta_order']==sta_order_start and end.at[i,'sta_order']==sta_order_end:
-            total+=(end.at[i,'arrival']-sta.at[i,'arrival'])
+            sumup=(end.at[i,'arrival']-sta.at[i,'arrival'])
+            total+=sumup
             counter+=1
+            sumup=sumup.total_seconds()
+            if sumup<20*60:
+                below_20+=1
+            elif sumup<30*60:
+                below_30+=1
+            elif sumup<40*60:
+                below_40+=1
+            elif sumup<50*60:
+                below_50+=1
+            else:
+                other+=1
+            trend=trend+[sumup/60]
         print('\r\tworking on:',i,'/',len(sta),end='')
     print('')
     print('average time for one trip is :',total/counter)
+    print(below_20,below_30,below_40,below_50,other,counter)
+    pyplot.figure(figsize=(42,18))
+    pyplot.ylim(ymax=100)
+    pyplot.plot(trend)
+    pyplot.savefig('analyse1.png')
 
 def analyse2(data:pd.DataFrame,sta_order_start=4,sta_order_end=23):
     data.query('sta_order>=@sta_order_start',inplace=True)
     data.query('sta_order<=@sta_order_end',inplace=True)
     total=0
     counter=0
+    max_time=0
+    trend=[]
     for row in data.iterrows():
         if row[1]['trip_time']!=0:
             total+=row[1]['trip_time']
             counter+=1
-        print('\r\t',row[0])
+            trend+=[row[1]['trip_time']/60]
+            if row[1]['trip_time'] > max_time:
+                max_time=row[1]['trip_time']
+        print('\r\t',row[0],end='')
     print('')
-    print('average trip time per sta in all time is:',total/counter,'s')
+    print('average trip time per sta in all time is:',total/counter,'s','maxt:',max_time,'s')
+    pyplot.figure(figsize=(42,18))
+    pyplot.ylim(ymax=55)
+    trend=trend[-10000:]
+    pyplot.plot(trend)
+    pyplot.savefig('analyse2.png')
 
 if __name__ == "__main__":
     print('process_tt_data')
@@ -290,9 +325,10 @@ if __name__ == "__main__":
     #timeslot_analyse(data,sta_order_start=2)
     data=prepare_dataset(data)
     timeslot_analyse(data,sta_order_start=4)
-    
+    '''   
     data=pd.read_csv('tt_add_order.csv',parse_dates=['arrival'])
     analyse1(data)
-    '''
+ 
     data=pd.read_csv('tt_add_travel_time.csv',parse_dates=['arrival'])
     analyse2(data)
+    
