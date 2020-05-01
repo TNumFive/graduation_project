@@ -138,4 +138,4 @@ if __name__ == "__main__":
     m=m.stdn(3,3,6,6)
     #m.summary()
     from keras.utils import plot_model
-    plot_model(m,show_shapes=False)
+    plot_model(m,'stdn.png',show_shapes=True)

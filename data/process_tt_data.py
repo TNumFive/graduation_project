@@ -100,7 +100,7 @@ def add_travel_time(data:pd.DataFrame)->pd.DataFrame:
     data.to_csv('tt_add_travel_time.csv',index=False)
     return data
 
-def make_timeslot_oneday(data:pd.DataFrame,sta_order_start=1,sta_order_end=23,slot_length=15)->pd.DataFrame:
+def make_timeslot_oneday(data:pd.DataFrame,slot_length=15)->pd.DataFrame:
     start=pd.Timedelta(minutes=0)
     maxtime=pd.Timedelta(days=1)
     date_day=data.iloc[0]['arrival']
@@ -132,7 +132,7 @@ def make_timeslot_oneday(data:pd.DataFrame,sta_order_start=1,sta_order_end=23,sl
     #print(' ')
     return oneday
 
-def make_timeslot(data:pd.DataFrame)->pd.DataFrame:
+def make_timeslot(data:pd.DataFrame,slot_length=15)->pd.DataFrame:
     print('make time slot')
     #data.columns='route_id,route_name,sta_id,sta_name,arrival,trip_id,inout,direction,sta_order'
     data.drop(columns=['route_name','sta_id','direction'],inplace=True)
@@ -148,7 +148,7 @@ def make_timeslot(data:pd.DataFrame)->pd.DataFrame:
         oneday=data.query('arrival>=@day_start and arrival <@day_end')
         day_start=day_end
         if(len(oneday)!=0):
-            oneday=make_timeslot_oneday(oneday)#获得当天的timeslot信息
+            oneday=make_timeslot_oneday(oneday,slot_length=slot_length)#获得当天的timeslot信息
             timeslot=timeslot.append(oneday,ignore_index=True)
     print('')
     timeslot.sort_index(axis=1,inplace=True)
@@ -325,10 +325,12 @@ if __name__ == "__main__":
     #timeslot_analyse(data,sta_order_start=2)
     data=prepare_dataset(data)
     timeslot_analyse(data,sta_order_start=4)
-    '''   
+  
     data=pd.read_csv('tt_add_order.csv',parse_dates=['arrival'])
     analyse1(data)
  
     data=pd.read_csv('tt_add_travel_time.csv',parse_dates=['arrival'])
     analyse2(data)
+    ''' 
+    
     
