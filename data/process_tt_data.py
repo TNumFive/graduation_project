@@ -136,6 +136,12 @@ def make_timeslot(data:pd.DataFrame,slot_length=15)->pd.DataFrame:
     print('make time slot')
     #data.columns='route_id,route_name,sta_id,sta_name,arrival,trip_id,inout,direction,sta_order'
     data.drop(columns=['route_name','sta_id','direction'],inplace=True)
+    drop_list=[]#drop error values that has sta_time below or equal to 0
+    for i in range(0,len(data)):
+        if data.at[i,'sta_time']<=0:
+            #print(data.at[i,'arrival'])
+            drop_list.append(i)
+    data.drop(index=drop_list,inplace=True)
     data.set_index(['arrival'],inplace=True,drop=False)
     #last_index=data.iloc[-1]['arrival']#获取最后一条信息的到达时间
     last_index=pd.to_datetime('2019-03-21')#由于缺少信息，3月份数据只到3-20为止
@@ -318,12 +324,7 @@ if __name__ == "__main__":
     data=extract_2_downflow()
     data=add_order(data)
     data=add_travel_time(data)
-    data=pd.read_csv('tt_add_travel_time.csv',parse_dates=['arrival'])
-    data=make_timeslot(data)
     
-    data=pd.read_csv('tt_timeslot.csv',parse_dates=['start_time'])
-    #timeslot_analyse(data,sta_order_start=2)
-    data=prepare_dataset(data)
     timeslot_analyse(data,sta_order_start=4)
   
     data=pd.read_csv('tt_add_order.csv',parse_dates=['arrival'])
@@ -332,5 +333,10 @@ if __name__ == "__main__":
     data=pd.read_csv('tt_add_travel_time.csv',parse_dates=['arrival'])
     analyse2(data)
     ''' 
+    data=pd.read_csv('tt_add_travel_time.csv',parse_dates=['arrival'])
+    data=make_timeslot(data)
+    data=pd.read_csv('tt_timeslot.csv',parse_dates=['start_time'])
+    data=prepare_dataset(data)
+
     
     

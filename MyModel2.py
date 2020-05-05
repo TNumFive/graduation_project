@@ -387,10 +387,10 @@ def historical_average_ptpw(
 
 #mse: 970.365199942062
 #mae: 21.545422153608346
-historical_average_ptpd()
+#historical_average_ptpd()
 #mse: 971.9304525247094
 #mae: 21.449440249781688
-historical_average_ptpw()
+#historical_average_ptpw()
 
 def plot_line(sta_order=(4,23)):
     data=pd.read_csv('tt_dataset.csv',parse_dates=['start_time'])

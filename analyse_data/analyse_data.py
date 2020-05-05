@@ -150,8 +150,12 @@ def timeslot_analyse(data:pd.DataFrame,sta_order_start=2,sta_order_end=23,slot_l
     mape='mape:%.4f'% mean_absolute_percentage_error(y_true,y_pred) +'%'
     average_sta_loss='average sta loss rate:%.4f'% average_sta_loss +'%'
     print(mse,mae,mape,average_sta_loss)
+    #print('slot_num_loss_dict:',slot_num_loss_dict)#时隙的缺失情况
+    #print('slot_sta_loss_dict:',slot_sta_loss_dict)#对于每个时隙，站点缺失情况
+    #print('sta_loss:',sta_loss)#整体站点缺失情况
     
 if False:
+    possible_slot_length=[6,10,12,15,20,30,60]
     for slot_length in possible_slot_length:
         print('make time slot with slot length:',slot_length)
         data=pd.read_csv('tt_add_tt_2.csv',parse_dates=['arrival'])
