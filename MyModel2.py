@@ -565,6 +565,8 @@ def MyModel(
     model.compile(optimizer=optimizer,loss=loss,metrics=metrics)
     return model
 
+'''
+very close to convlstm on st on mse and slightly better than that on mae
 def MyModel_Conv2D(
     name='MyModel_Conv2D',
     sta_num=20,
@@ -618,9 +620,69 @@ def MyModel_Conv2D(
   y=layers.concatenate([y1,y2,ef])
   y=layers.Dense(sta_num)(y)
 
-  model=Model([lt,st,lt_wd,st_wd,lt_ef,st_ef],[y],name='MyModel')
+  model=Model([lt,st,lt_wd,st_wd,lt_ef,st_ef],[y],name=name)
   model.compile(optimizer=optimizer,loss=loss,metrics=metrics)
+  
   return model
+
+'''
+
+def MyModel_Conv2D(
+    name='MyModel_Conv2D',
+    sta_num=20,
+    lt_shape=(3,15,20),
+    st_shape=(72,20),
+    wd_shape=(4,1),
+    ef_shape=(4,24),
+    op_shape=(1,20),
+    optimizer='adam',
+    metrics=['mae'],
+    loss='mse'
+)->Model:
+    print('model name:',name)
+    lt=layers.Input(shape=lt_shape)
+    st=layers.Input(shape=st_shape)
+    lt_wd=layers.Input(shape=(lt_shape[0],wd_shape[1]))
+    st_wd=layers.Input(shape=(wd_shape[1],))
+    lt_ef=layers.Input(shape=(lt_shape[0],ef_shape[1]))
+    st_ef=layers.Input(shape=(ef_shape[1],))
+
+    y1=layers.Reshape((lt_shape[0],lt_shape[1],lt_shape[2],1))(lt)
+    y1=layers.ConvLSTM2D(filters=64,kernel_size=(6,6),padding='same',return_sequences=True)(y1)
+    y1=layers.Dropout(0.5)(y1)
+    y1=layers.ConvLSTM2D(filters=64,kernel_size=(6,6),padding='same',return_sequences=True)(y1)
+    y1=layers.Dropout(0.25)(y1)
+    y1=layers.Dense(1)(y1)
+    y1=layers.Reshape(lt_shape)(y1)
+    y1=layers.TimeDistributed(attention())(y1)
+    y1=layers.Flatten()(y1)
+
+    y2=layers.Reshape((st_shape[0],st_shape[1],1))(st)
+    y2=layers.Conv2D(filters=64,kernel_size=(6,6),padding='same')(y2)
+    y2=layers.ReLU()(y2)
+    y2=layers.Conv2D(filters=64,kernel_size=(6,6),padding='same')(y2)
+    y2=layers.ReLU()(y2)
+    y2=layers.Dense(1)(y2)
+    y2=layers.Reshape(st_shape)(y2)
+    y2=attention()(y2)
+
+    ltef=layers.concatenate([lt_wd,lt_ef])
+    stef=layers.concatenate([st_wd,st_ef])
+    stef=layers.Reshape((1,wd_shape[1]+ef_shape[1]))(stef)
+    ef=layers.concatenate([ltef,stef],axis=1)
+    ef=layers.LSTM(64,return_sequences=True)(ef)
+    ef=layers.Dropout(0.2)(ef)
+    ef=layers.LSTM(64,return_sequences=True)(ef)
+    ef=layers.Dropout(0.2)(ef)
+    ef=layers.ReLU()(ef)
+    ef=attention()(ef)
+    
+    y=layers.concatenate([y1,y2,ef])
+    y=layers.Dense(sta_num)(y)
+
+    model=Model([lt,st,lt_wd,st_wd,lt_ef,st_ef],[y],name='MyModel')
+    model.compile(optimizer=optimizer,loss=loss,metrics=metrics)
+    return model
 
 model=MyModel_Conv2D()
 plot_model(model,model.name+'.png',show_shapes=True)
